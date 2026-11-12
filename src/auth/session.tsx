@@ -1,14 +1,11 @@
 import type { Session } from '@supabase/supabase-js';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { api, ApiError, setApiOrg } from '@/lib/api';
 import { authenticate, biometricsAvailable } from '@/lib/biometrics';
 import { appRoleFor, type AppRole, type HumanRole } from '@/lib/roles';
 import { secure } from '@/lib/secure';
 import { supabase } from '@/lib/supabase';
-
-/** Lock the app after this long in the background. */
-export const AUTO_LOCK_MS = 5 * 60_000;
 
 type Status = 'loading' | 'signed_out' | 'locked' | 'ready';
 
@@ -37,6 +34,7 @@ interface OrgResponse {
 
 interface SessionState {
   status: Status;
+  userId: string;
   userName: string;
   email: string | null;
   org: OrgContext | null;
@@ -60,6 +58,7 @@ const Ctx = createContext<SessionState | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>('loading');
+  const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
   const [email, setEmail] = useState<string | null>(null);
   const [org, setOrg] = useState<OrgContext | null>(null);
@@ -67,9 +66,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [biometrics, setBio] = useState<'on' | 'off' | null>(null);
   const [askBiometrics, setAskBiometrics] = useState(false);
   const [privacyCover, setPrivacyCover] = useState(false);
-  const backgroundSince = useRef<number | null>(null);
-  const statusRef = useRef(status);
-  statusRef.current = status;
 
   // Keep the newest refresh token in the Keychain (supabase-js rotates it on every refresh).
   useEffect(() => {
@@ -82,6 +78,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const loadContext = useCallback(async () => {
     const me = await api<MeResponse>('/me', { org: false });
+    setUserId(me.user_id);
     setUserName(me.profile?.full_name || me.email || '');
     setEmail(me.email);
     if (!me.organizations.length) {
@@ -109,6 +106,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setApiOrg(null);
     setOrg(null);
     setNoOrg(false);
+    setUserId('');
     setUserName('');
     setEmail(null);
     await secure.setRefreshToken(null);
@@ -151,23 +149,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     })();
   }, [restore]);
 
-  // Auto-lock after AUTO_LOCK_MS in the background; cover content in the app switcher.
+  // Face ID is asked only when the app is opened (cold start). In the app switcher the content is covered.
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        setPrivacyCover(false);
-        const since = backgroundSince.current;
-        backgroundSince.current = null;
-        if (since && Date.now() - since > AUTO_LOCK_MS && statusRef.current === 'ready') {
-          void secure.getBiometrics().then((b) => {
-            if (b === 'on') setStatus('locked');
-          });
-        }
-      } else {
-        setPrivacyCover(true);
-        if (state === 'background' && backgroundSince.current === null) backgroundSince.current = Date.now();
-      }
-    });
+    const sub = AppState.addEventListener('change', (state) => setPrivacyCover(state !== 'active'));
     return () => sub.remove();
   }, []);
 
@@ -224,6 +208,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<SessionState>(
     () => ({
       status,
+      userId,
       userName,
       email,
       org,
@@ -243,7 +228,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       reload: loadContext,
       can: (p) => Boolean(org?.permissions.includes(p)),
     }),
-    [status, userName, email, org, noOrg, biometrics, askBiometrics, privacyCover, signIn, unlock, signOut, setBiometrics, loadContext],
+    [status, userId, userName, email, org, noOrg, biometrics, askBiometrics, privacyCover, signIn, unlock, signOut, setBiometrics, loadContext],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

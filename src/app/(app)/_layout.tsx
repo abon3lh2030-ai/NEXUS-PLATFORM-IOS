@@ -1,27 +1,33 @@
-import { Tabs } from 'expo-router';
-import { SymbolView, type SFSymbol } from 'expo-symbols';
-import type { ColorValue } from 'react-native';
-import { fonts, useColors } from '@/theme';
+import { NativeTabs } from 'expo-router/native-tabs';
+import { useSession } from '@/auth/session';
+import { usePendingApprovals } from '@/lib/data';
+import { useColors } from '@/theme';
 
-const icon = (name: SFSymbol) =>
-  function TabIcon({ color }: { color: ColorValue }) {
-    return <SymbolView name={name} size={24} tintColor={color as string} />;
-  };
-
+/** Native iOS tab bar — Liquid Glass on iOS 26. */
 export default function AppTabs() {
   const c = useColors();
+  const { can } = useSession();
+  const canDecide = can('approvals.decide');
+  const pending = usePendingApprovals().data?.length ?? 0;
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: c.primary,
-        tabBarInactiveTintColor: c.mutedForeground,
-        tabBarStyle: { backgroundColor: c.card, borderTopColor: c.border },
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
-      }}
-    >
-      <Tabs.Screen name="index" options={{ title: 'الرئيسية', tabBarIcon: icon('house.fill') }} />
-      <Tabs.Screen name="settings" options={{ title: 'الإعدادات', tabBarIcon: icon('gearshape.fill') }} />
-    </Tabs>
+    <NativeTabs tintColor={c.primary} minimizeBehavior="onScrollDown">
+      <NativeTabs.Trigger name="(home)">
+        <NativeTabs.Trigger.Label>الرئيسية</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="approvals" hidden={!canDecide}>
+        <NativeTabs.Trigger.Label>الموافقات</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'checkmark.seal', selected: 'checkmark.seal.fill' }} />
+        {canDecide && pending > 0 ? <NativeTabs.Trigger.Badge>{pending > 9 ? '9+' : String(pending)}</NativeTabs.Trigger.Badge> : null}
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="tasks">
+        <NativeTabs.Trigger.Label>المهام</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'checklist', selected: 'checklist' }} />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings">
+        <NativeTabs.Trigger.Label>الإعدادات</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} />
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }
