@@ -1,5 +1,5 @@
 import { useRef, useState, type ComponentRef } from 'react';
-import { KeyboardAvoidingView, ScrollView, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, ScrollView, TextInput, View } from 'react-native';
 import { useSession } from '@/auth/session';
 import { Button, Card, Input, Screen, Text } from '@/components/ui';
 import { ApiError } from '@/lib/api';
@@ -38,6 +38,7 @@ export default function Login() {
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, gap: 28 }} keyboardShouldPersistTaps="handled">
           <View style={{ alignItems: 'center', gap: 8 }}>
+            <Image source={require('../../../assets/logo-mark.png')} style={{ width: 72, height: 72 }} accessibilityIgnoresInvertColors />
             <Text weight="bold" size={36} style={{ color: c.primary, letterSpacing: 6, textAlign: 'center' }}>NEXUS</Text>
             <Text muted style={{ textAlign: 'center' }}>تابع موظفيك واتخذ قراراتك من جوالك</Text>
           </View>
